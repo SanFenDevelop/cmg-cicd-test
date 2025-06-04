@@ -1,0 +1,47 @@
+@startuml run-compute-job
+
+actor "Worker Daemon" as wd
+participant "Worker Gateway" as wg
+participant "Worker Registry" as wr
+participant "Job" as j
+
+== Get Job / Heartbeat (AVAILABLE)==
+
+wd -> wg : POST /worker/heartbeat \n{ workerId, status: "AVAILABLE" } 
+wg -> wr : PUT /worker/{id}/status\n{ status: "AVAILABLE" }
+wg -> j  : GET /jobs/{["scheduled"]}
+alt Jobs scheduled
+    j -> wg : 200 OK\n{ Jobs }
+        note over wg: Filter Jobs by workerId.
+    wg -> wd : 200 OK\n{ Jobs }
+    note over wd: Jobs assigned.\nPick first Job of Jobs[] and start execution.
+
+else No Jobs scheduled or Error
+    j -> wg : OK { [] }\nor ERROR
+    wg -> wd : OK { [] }\nor ERROR
+    note over wd: No Jobs assigned yet or error.\nWait for next heartbeat.
+    
+end
+
+== Execute Job / Heartbeat (COMPUTING) ==
+
+wd -> wg : POST /worker/heartbeat \n{ workerId, status: "COMPUTING" }
+wg -> wr : PUT /worker/{id}/status\n{ status: "COMPUTING" }
+wg -> j  : PATCH /job/{id}/update-workerdeamon\n{ status: "RUNNING" }
+    note over wd: Repeat this section while computing.
+
+== Finish Job ==
+    note over wd: Compute job done.
+wd -> wg : POST /result\n{ jobId, status, result }
+wg -> j  : PATCH /jobs/{id}/update-workerdeamon\n{ status: "COMPLETED", result, errorMessage }
+alt Result delivered
+    j -> wg : OK
+else Error
+    j -> wg : ERROR
+        note over wg: Repeat call after delay.
+    wg -> j  : PATCH /jobs/{id}/update-workerdeamon\n{ status: "COMPLETED", result, errorMessage }
+end
+
+    note over wd: restart workflow with \nHeartbeat (AVAILABLE).
+
+@enduml
