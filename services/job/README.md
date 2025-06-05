@@ -15,7 +15,7 @@ A microservice for managing consumer jobs in a queue system. This service provid
 
 ## Technology Stack
 
-- **Language:** Go lolol
+- **Language:** Go lololdwa awdwa
 - **API:** REST (JSON)
 - **Containerization:** Docker
 - **Testing:** Go test framework, in-memory repository for fast tests
